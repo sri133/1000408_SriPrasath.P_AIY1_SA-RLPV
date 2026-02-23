@@ -221,6 +221,78 @@ st.set_page_config(layout="wide")
 st.title("🚀Mission Simulator ")
 
 # -------------------------------------------------
+# GET SELECTED MISSION DATA
+# -------------------------------------------------
+mission_row = df[df["Mission Name"] == mission].iloc[0]
+
+payload = mission_row["Payload Weight (tons)"] * 1000
+fuel = mission_row["Fuel Consumption (tons)"] * 1000
+success_rate = mission_row["Mission Success (%)"]
+distance = mission_row["Distance from Earth (light-years)"]
+duration = mission_row["Mission Duration (years)"]
+
+# Scale values realistically for simulation
+thrust_power = fuel * 30
+base_mass = 500000
+total_mass = base_mass + payload
+
+# Initial velocity based on thrust-to-mass ratio
+initial_velocity = thrust_power / total_mass
+
+# Orbit requirement threshold
+orbit_threshold = 7500
+
+# Destination scaling
+planet_distance = 15000 + (distance * 1000)
+
+frames = 250
+earth_radius = 6371
+orbit_radius = earth_radius + 800
+
+trajectory_x = []
+trajectory_y = []
+
+orbit_achieved = False
+mission_failed = False
+
+for i in range(frames):
+    t = i / frames
+
+    # Launch phase
+    if t < 0.25:
+        x = 0
+        y = earth_radius + t * initial_velocity
+
+    # Orbit phase
+    elif t < 0.6:
+        if initial_velocity > orbit_threshold:
+            orbit_achieved = True
+            angle = (t - 0.25) * 18
+            x = orbit_radius * np.cos(angle)
+            y = orbit_radius * np.sin(angle)
+        else:
+            mission_failed = True
+            x = 0
+            y = earth_radius - (t - 0.25) * 5000
+
+    # Transfer phase
+    else:
+        if orbit_achieved:
+            progress = (t - 0.6) / 0.4
+            x = orbit_radius + progress * (planet_distance - orbit_radius)
+            y = orbit_radius * np.sin(progress * np.pi)
+        else:
+            x = 0
+            y = earth_radius - 2000
+
+    trajectory_x.append(x)
+    trajectory_y.append(y)
+
+# Apply mission success probability
+if np.random.randint(0, 100) > success_rate:
+    mission_failed = True
+
+# -------------------------------------------------
 # Load Dataset
 # -------------------------------------------------
 @st.cache_data
@@ -357,4 +429,5 @@ fig = go.Figure(
 st.plotly_chart(fig, use_container_width=True)
 
 st.success(f"🎯 Mission to {mission} simulated successfully.")
+
 
