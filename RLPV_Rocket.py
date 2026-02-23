@@ -209,34 +209,44 @@ m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
 #additional features
 #----------------------------------------------------------
 # =====================================================
-# 🌍 REAL-TIME ORBITAL SIMULATION (WORKING VERSION)
+# 🌍 ORBIT SIMULATION WITH ROTATING EARTH
 # =====================================================
-st.header("🌍 Real-Time Orbital Simulation")
 
-import math
+import streamlit as st
+import numpy as np
+import plotly.graph_objects as go
 import time
+import math
 
+st.header("🌍 Earth Orbit Simulation (Rotating Earth)")
+
+# ---- Constants ----
 G = 6.67430e-11
 EARTH_MASS = 5.972e24
 EARTH_RADIUS = 6.371e6
 
-dt = 2
-steps = 4000
+dt = 1
+steps = 9000
+orbit_altitude = 400000  # 400 km
 
-# Initial position (surface)
-x = EARTH_RADIUS
+r0 = EARTH_RADIUS + orbit_altitude
+x = r0
 y = 0
 
-# Give sideways velocity for orbit
+v_orbit = math.sqrt(G * EARTH_MASS / r0)
 vx = 0
-vy = 7900  # Slightly above orbital velocity
-
-placeholder = st.empty()
+vy = v_orbit
 
 positions_x = []
 positions_y = []
 
-for _ in range(steps):
+placeholder = st.empty()
+
+revolution_count = 0
+previous_angle = 0
+earth_rotation = 0  # rotation angle
+
+for i in range(steps):
 
     r = math.sqrt(x**2 + y**2)
 
@@ -252,18 +262,31 @@ for _ in range(steps):
     positions_x.append(x)
     positions_y.append(y)
 
-    # Stop if crashed
-    if r <= EARTH_RADIUS:
-        st.error("💥 Rocket crashed back to Earth!")
+    # Count revolutions
+    angle = math.atan2(y, x)
+    if previous_angle < 0 and angle >= 0:
+        revolution_count += 1
+    previous_angle = angle
+
+    if revolution_count >= 3:
         break
 
-    # Draw Earth
-    theta = np.linspace(0, 2*np.pi, 300)
-    earth_x = EARTH_RADIUS * np.cos(theta)
-    earth_y = EARTH_RADIUS * np.sin(theta)
+    # ---- Earth Rotation ----
+    earth_rotation += 0.01  # controls rotation speed
+
+    theta = np.linspace(0, 2*np.pi, 400)
+    earth_x = EARTH_RADIUS * np.cos(theta + earth_rotation)
+    earth_y = EARTH_RADIUS * np.sin(theta + earth_rotation)
+
+    # Destination Orbit
+    dest_alt = 600000
+    dest_r = EARTH_RADIUS + dest_alt
+    dest_x = dest_r * np.cos(theta)
+    dest_y = dest_r * np.sin(theta)
 
     fig = go.Figure()
 
+    # Earth (rotating visual)
     fig.add_trace(go.Scatter(
         x=earth_x,
         y=earth_y,
@@ -272,13 +295,24 @@ for _ in range(steps):
         name="Earth"
     ))
 
+    # Destination orbit ring
+    fig.add_trace(go.Scatter(
+        x=dest_x,
+        y=dest_y,
+        mode="lines",
+        line=dict(dash="dash"),
+        name="Destination Orbit"
+    ))
+
+    # Rocket path
     fig.add_trace(go.Scatter(
         x=positions_x,
         y=positions_y,
         mode="lines",
-        name="Orbit Path"
+        name="Rocket Path"
     ))
 
+    # Rocket
     fig.add_trace(go.Scatter(
         x=[x],
         y=[y],
@@ -297,5 +331,6 @@ for _ in range(steps):
     )
 
     placeholder.plotly_chart(fig, use_container_width=True)
+    time.sleep(0.01)
 
-    time.sleep(0.02)
+st.success(f"🛰 Completed {revolution_count} full orbits successfully!")
