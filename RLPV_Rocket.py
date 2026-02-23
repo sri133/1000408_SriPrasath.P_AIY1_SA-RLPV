@@ -209,27 +209,29 @@ m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
 #additional features
 #----------------------------------------------------------
 # =====================================================
-# 🌍 2D ORBITAL MECHANICS SIMULATION
+# 🌍 REAL-TIME ORBITAL SIMULATION (WORKING VERSION)
 # =====================================================
-st.header("🌍 Orbital Simulation Around Earth")
+st.header("🌍 Real-Time Orbital Simulation")
 
 import math
+import time
 
-# Constants
 G = 6.67430e-11
 EARTH_MASS = 5.972e24
 EARTH_RADIUS = 6.371e6
 
-dt = 1
-steps = 5000
+dt = 2
+steps = 4000
 
-# Initial position (on Earth's surface)
+# Initial position (surface)
 x = EARTH_RADIUS
 y = 0
 
-# Initial velocities
+# Give sideways velocity for orbit
 vx = 0
-vy = 7800  # orbital speed approx
+vy = 7900  # Slightly above orbital velocity
+
+placeholder = st.empty()
 
 positions_x = []
 positions_y = []
@@ -238,15 +240,12 @@ for _ in range(steps):
 
     r = math.sqrt(x**2 + y**2)
 
-    # Gravitational acceleration
     ax = -G * EARTH_MASS * x / r**3
     ay = -G * EARTH_MASS * y / r**3
 
-    # Update velocity
     vx += ax * dt
     vy += ay * dt
 
-    # Update position
     x += vx * dt
     y += vy * dt
 
@@ -254,104 +253,49 @@ for _ in range(steps):
     positions_y.append(y)
 
     # Stop if crashed
-    if r < EARTH_RADIUS:
+    if r <= EARTH_RADIUS:
+        st.error("💥 Rocket crashed back to Earth!")
         break
 
-orbit_df = pd.DataFrame({
-    "x": positions_x,
-    "y": positions_y
-})
+    # Draw Earth
+    theta = np.linspace(0, 2*np.pi, 300)
+    earth_x = EARTH_RADIUS * np.cos(theta)
+    earth_y = EARTH_RADIUS * np.sin(theta)
 
-# Create Earth circle
-theta = np.linspace(0, 2*np.pi, 500)
-earth_x = EARTH_RADIUS * np.cos(theta)
-earth_y = EARTH_RADIUS * np.sin(theta)
+    fig = go.Figure()
 
-# Destination marker (example)
-destination_x = EARTH_RADIUS + 400000  # 400 km altitude
-destination_y = 0
-
-# Plot
-fig_orbit = go.Figure()
-
-# Earth
-fig_orbit.add_trace(
-    go.Scatter(
+    fig.add_trace(go.Scatter(
         x=earth_x,
         y=earth_y,
         mode="lines",
         fill="toself",
         name="Earth"
-    )
-)
+    ))
 
-# Orbit path
-fig_orbit.add_trace(
-    go.Scatter(
-        x=orbit_df["x"],
-        y=orbit_df["y"],
+    fig.add_trace(go.Scatter(
+        x=positions_x,
+        y=positions_y,
         mode="lines",
         name="Orbit Path"
-    )
-)
+    ))
 
-# Rocket marker
-fig_orbit.add_trace(
-    go.Scatter(
-        x=[orbit_df["x"].iloc[0]],
-        y=[orbit_df["y"].iloc[0]],
+    fig.add_trace(go.Scatter(
+        x=[x],
+        y=[y],
         mode="markers+text",
         text=["🚀"],
         textposition="middle center",
-        marker=dict(size=12),
+        marker=dict(size=14),
         name="Rocket"
+    ))
+
+    fig.update_layout(
+        xaxis=dict(scaleanchor="y", scaleratio=1, visible=False),
+        yaxis=dict(visible=False),
+        showlegend=False,
+        height=700
     )
-)
 
-# Destination
-fig_orbit.add_trace(
-    go.Scatter(
-        x=[destination_x],
-        y=[destination_y],
-        mode="markers+text",
-        text=["🎯 Destination"],
-        textposition="top center",
-        marker=dict(size=10),
-        name="Target Orbit"
-    )
-)
+    placeholder.plotly_chart(fig, use_container_width=True)
 
-# Animate
-frames = [
-    go.Frame(
-        data=[
-            go.Scatter(x=earth_x, y=earth_y),
-            go.Scatter(x=orbit_df["x"][:k], y=orbit_df["y"][:k]),
-            go.Scatter(
-                x=[orbit_df["x"].iloc[k]],
-                y=[orbit_df["y"].iloc[k]],
-                mode="markers+text",
-                text=["🚀"]
-            ),
-            go.Scatter(x=[destination_x], y=[destination_y])
-        ]
-    )
-    for k in range(1, len(orbit_df), 10)
-]
-
-fig_orbit.frames = frames
-
-fig_orbit.update_layout(
-    xaxis=dict(scaleanchor="y", scaleratio=1),
-    height=700,
-    updatemenus=[{
-        "type": "buttons",
-        "buttons": [{
-            "label": "Start Orbit 🚀",
-            "method": "animate",
-            "args": [None, {"frame": {"duration": 20, "redraw": False}}]
-        }]
-    }]
-)
-
-st.plotly_chart(fig_orbit, use_container_width=True)
+    time.sleep(0.02)
