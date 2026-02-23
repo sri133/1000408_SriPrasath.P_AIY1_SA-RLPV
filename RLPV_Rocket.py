@@ -244,6 +244,36 @@ def load_data():
 
 df = load_data()
 
+
+# -------------------------------------------------
+# SUCCESS FILTER
+# -------------------------------------------------
+st.sidebar.header("🛰 Mission Selection")
+
+show_success_only = st.sidebar.checkbox("Show Only Successful Missions")
+
+if show_success_only:
+    mission_df = df[df["Mission Success (%)"] >= 70]
+else:
+    mission_df = df.copy()
+
+# Add success label
+mission_df["Mission Label"] = mission_df.apply(
+    lambda row: f"🟢 {row['Mission Name']} ({row['Mission Success (%)']}%)"
+    if row["Mission Success (%)"] >= 70
+    else f"🔴 {row['Mission Name']} ({row['Mission Success (%)']}%)",
+    axis=1
+)
+
+mission_label = st.sidebar.selectbox(
+    "Choose Mission",
+    mission_df["Mission Label"]
+)
+
+# Extract real mission name
+mission = mission_label.split(" (")[0][2:].strip()
+
+mission_row = df[df["Mission Name"] == mission].iloc[0]
 # -------------------------------------------------
 # SELECT MISSION
 # -------------------------------------------------
@@ -432,3 +462,4 @@ col1, col2, col3 = st.columns(3)
 col1.metric("Payload (kg)", f"{payload:,.0f}")
 col2.metric("Initial Velocity", f"{initial_velocity:,.0f} m/s")
 col3.metric("Mission Success %", f"{success_rate}%")
+
