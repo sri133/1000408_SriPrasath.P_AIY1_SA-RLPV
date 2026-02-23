@@ -209,107 +209,149 @@ m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
 #additional features
 #----------------------------------------------------------
 # =====================================================
-# 🚀 SMOOTH NASA-STYLE ANIMATION (NO FLICKER)
+# 🌍 2D ORBITAL MECHANICS SIMULATION
 # =====================================================
-st.header("🚀 Rocket Launch Simulation (Smooth Animation)")
+st.header("🌍 Orbital Simulation Around Earth")
 
-ORBIT_VELOCITY = 7800
+import math
 
-frames = []
-orbit_reached = False
+# Constants
+G = 6.67430e-11
+EARTH_MASS = 5.972e24
+EARTH_RADIUS = 6.371e6
 
-max_alt = sim_df["Altitude (m)"].max()
-max_time = sim_df["Time (s)"].max()
+dt = 1
+steps = 5000
 
-def atmosphere_color(alt):
-    if alt < 10000:
-        return "#87CEEB"
-    elif alt < 50000:
-        return "#4B79A1"
-    elif alt < 100000:
-        return "#1B3C59"
-    else:
-        return "#000000"
+# Initial position (on Earth's surface)
+x = EARTH_RADIUS
+y = 0
 
-for i in range(len(sim_df)):
-    current_alt = sim_df["Altitude (m)"].iloc[i]
-    current_vel = sim_df["Velocity (m/s)"].iloc[i]
-    current_time = sim_df["Time (s)"].iloc[i]
+# Initial velocities
+vx = 0
+vy = 7800  # orbital speed approx
 
-    bg_color = atmosphere_color(current_alt)
+positions_x = []
+positions_y = []
 
-    flame_visible = sim_df["Mass (kg)"].iloc[i] > rocket_mass + payload
+for _ in range(steps):
 
-    frame_data = [
-        go.Scatter(
-            x=sim_df["Time (s)"][:i+1],
-            y=sim_df["Altitude (m)"][:i+1],
-            mode="lines",
-            line=dict(width=3),
-        ),
-        go.Scatter(
-            x=[current_time],
-            y=[current_alt],
-            mode="text",
-            text=["🚀"],
-            textfont=dict(size=28),
-        )
-    ]
+    r = math.sqrt(x**2 + y**2)
 
-    if flame_visible:
-        frame_data.append(
-            go.Scatter(
-                x=[current_time],
-                y=[current_alt - max_alt*0.03],
-                mode="text",
-                text=["🔥"],
-                textfont=dict(size=22),
-            )
-        )
+    # Gravitational acceleration
+    ax = -G * EARTH_MASS * x / r**3
+    ay = -G * EARTH_MASS * y / r**3
 
-    frames.append(
-        go.Frame(
-            data=frame_data,
-            layout=go.Layout(
-                plot_bgcolor=bg_color,
-                paper_bgcolor=bg_color
-            )
-        )
+    # Update velocity
+    vx += ax * dt
+    vy += ay * dt
+
+    # Update position
+    x += vx * dt
+    y += vy * dt
+
+    positions_x.append(x)
+    positions_y.append(y)
+
+    # Stop if crashed
+    if r < EARTH_RADIUS:
+        break
+
+orbit_df = pd.DataFrame({
+    "x": positions_x,
+    "y": positions_y
+})
+
+# Create Earth circle
+theta = np.linspace(0, 2*np.pi, 500)
+earth_x = EARTH_RADIUS * np.cos(theta)
+earth_y = EARTH_RADIUS * np.sin(theta)
+
+# Destination marker (example)
+destination_x = EARTH_RADIUS + 400000  # 400 km altitude
+destination_y = 0
+
+# Plot
+fig_orbit = go.Figure()
+
+# Earth
+fig_orbit.add_trace(
+    go.Scatter(
+        x=earth_x,
+        y=earth_y,
+        mode="lines",
+        fill="toself",
+        name="Earth"
     )
-
-    if current_vel >= ORBIT_VELOCITY:
-        orbit_reached = True
-
-fig = go.Figure(
-    data=[
-        go.Scatter(mode="lines"),
-        go.Scatter(mode="text"),
-        go.Scatter(mode="text")
-    ],
-    frames=frames
 )
 
-fig.update_layout(
-    xaxis=dict(range=[0, max_time], visible=False),
-    yaxis=dict(range=[0, max_alt*1.1], visible=False),
-    height=600,
-    showlegend=False,
+# Orbit path
+fig_orbit.add_trace(
+    go.Scatter(
+        x=orbit_df["x"],
+        y=orbit_df["y"],
+        mode="lines",
+        name="Orbit Path"
+    )
+)
+
+# Rocket marker
+fig_orbit.add_trace(
+    go.Scatter(
+        x=[orbit_df["x"].iloc[0]],
+        y=[orbit_df["y"].iloc[0]],
+        mode="markers+text",
+        text=["🚀"],
+        textposition="middle center",
+        marker=dict(size=12),
+        name="Rocket"
+    )
+)
+
+# Destination
+fig_orbit.add_trace(
+    go.Scatter(
+        x=[destination_x],
+        y=[destination_y],
+        mode="markers+text",
+        text=["🎯 Destination"],
+        textposition="top center",
+        marker=dict(size=10),
+        name="Target Orbit"
+    )
+)
+
+# Animate
+frames = [
+    go.Frame(
+        data=[
+            go.Scatter(x=earth_x, y=earth_y),
+            go.Scatter(x=orbit_df["x"][:k], y=orbit_df["y"][:k]),
+            go.Scatter(
+                x=[orbit_df["x"].iloc[k]],
+                y=[orbit_df["y"].iloc[k]],
+                mode="markers+text",
+                text=["🚀"]
+            ),
+            go.Scatter(x=[destination_x], y=[destination_y])
+        ]
+    )
+    for k in range(1, len(orbit_df), 10)
+]
+
+fig_orbit.frames = frames
+
+fig_orbit.update_layout(
+    xaxis=dict(scaleanchor="y", scaleratio=1),
+    height=700,
     updatemenus=[{
         "type": "buttons",
         "buttons": [{
-            "label": "Launch 🚀",
+            "label": "Start Orbit 🚀",
             "method": "animate",
-            "args": [None, {
-                "frame": {"duration": 40, "redraw": False},
-                "fromcurrent": True
-            }]
+            "args": [None, {"frame": {"duration": 20, "redraw": False}}]
         }]
     }]
 )
 
-st.plotly_chart(fig, use_container_width=True)
-
-if orbit_reached:
-    st.success("🛰 ORBIT ACHIEVED! Stable orbital velocity reached.")
-else:
-    st.warning("⚠ Orbit not achieved. Try increasing thrust or reducing payload.")
+st.plotly_chart(fig_orbit, use_container_width=True)
