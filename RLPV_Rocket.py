@@ -209,73 +209,44 @@ m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
 #additional features
 #----------------------------------------------------------
 # =====================================================
-# 🚀 NASA-Level Animated Rocket Launch
+# 🚀 SMOOTH NASA-STYLE ANIMATION (NO FLICKER)
 # =====================================================
-import time
-import base64
+st.header("🚀 Rocket Launch Simulation (Smooth Animation)")
 
-st.header("🚀 Live Rocket Launch Simulation")
+ORBIT_VELOCITY = 7800
 
-# Orbit threshold (approx low Earth orbit velocity)
-ORBIT_VELOCITY = 7800  # m/s
-
-# Placeholder containers
-chart_placeholder = st.empty()
-status_placeholder = st.empty()
-
-# Background atmosphere color function
-def atmosphere_color(alt):
-    if alt < 10000:
-        return "#87CEEB"  # light blue
-    elif alt < 50000:
-        return "#4B79A1"  # mid blue
-    elif alt < 100000:
-        return "#1B3C59"  # dark blue
-    else:
-        return "#000000"  # space black
-
-# Play launch sound (base64 small rocket sound)
-rocket_sound = """
-<audio autoplay>
-  <source src="https://www.soundjay.com/mechanical/sounds/rocket-launch-01.mp3" type="audio/mpeg">
-</audio>
-"""
-st.markdown(rocket_sound, unsafe_allow_html=True)
-
+frames = []
 orbit_reached = False
 
-for i in range(len(sim_df)):
+max_alt = sim_df["Altitude (m)"].max()
+max_time = sim_df["Time (s)"].max()
 
+def atmosphere_color(alt):
+    if alt < 10000:
+        return "#87CEEB"
+    elif alt < 50000:
+        return "#4B79A1"
+    elif alt < 100000:
+        return "#1B3C59"
+    else:
+        return "#000000"
+
+for i in range(len(sim_df)):
     current_alt = sim_df["Altitude (m)"].iloc[i]
     current_vel = sim_df["Velocity (m/s)"].iloc[i]
     current_time = sim_df["Time (s)"].iloc[i]
 
     bg_color = atmosphere_color(current_alt)
 
-    fig_live = go.Figure()
+    flame_visible = sim_df["Mass (kg)"].iloc[i] > rocket_mass + payload
 
-    # Background color change
-    fig_live.update_layout(
-        plot_bgcolor=bg_color,
-        paper_bgcolor=bg_color,
-        xaxis=dict(range=[0, sim_df["Time (s)"].max()], visible=False),
-        yaxis=dict(range=[0, sim_df["Altitude (m)"].max()*1.1], visible=False),
-        showlegend=False,
-        height=600
-    )
-
-    # Rocket path
-    fig_live.add_trace(
+    frame_data = [
         go.Scatter(
             x=sim_df["Time (s)"][:i+1],
             y=sim_df["Altitude (m)"][:i+1],
             mode="lines",
             line=dict(width=3),
-        )
-    )
-
-    # Rocket body
-    fig_live.add_trace(
+        ),
         go.Scatter(
             x=[current_time],
             y=[current_alt],
@@ -283,28 +254,62 @@ for i in range(len(sim_df)):
             text=["🚀"],
             textfont=dict(size=28),
         )
-    )
+    ]
 
-    # Exhaust flame effect
-    if sim_df["Mass (kg)"].iloc[i] > rocket_mass + payload:
-        fig_live.add_trace(
+    if flame_visible:
+        frame_data.append(
             go.Scatter(
                 x=[current_time],
-                y=[current_alt - sim_df["Altitude (m)"].max()*0.03],
+                y=[current_alt - max_alt*0.03],
                 mode="text",
                 text=["🔥"],
                 textfont=dict(size=22),
             )
         )
 
-    chart_placeholder.plotly_chart(fig_live, use_container_width=True)
+    frames.append(
+        go.Frame(
+            data=frame_data,
+            layout=go.Layout(
+                plot_bgcolor=bg_color,
+                paper_bgcolor=bg_color
+            )
+        )
+    )
 
-    # Orbit detection
-    if current_vel >= ORBIT_VELOCITY and not orbit_reached:
-        status_placeholder.success("🛰 ORBIT ACHIEVED! Stable orbital velocity reached.")
+    if current_vel >= ORBIT_VELOCITY:
         orbit_reached = True
 
-    time.sleep(0.03)
+fig = go.Figure(
+    data=[
+        go.Scatter(mode="lines"),
+        go.Scatter(mode="text"),
+        go.Scatter(mode="text")
+    ],
+    frames=frames
+)
 
-if not orbit_reached:
-    status_placeholder.warning("⚠ Orbit not achieved. Increase thrust or reduce payload.")
+fig.update_layout(
+    xaxis=dict(range=[0, max_time], visible=False),
+    yaxis=dict(range=[0, max_alt*1.1], visible=False),
+    height=600,
+    showlegend=False,
+    updatemenus=[{
+        "type": "buttons",
+        "buttons": [{
+            "label": "Launch 🚀",
+            "method": "animate",
+            "args": [None, {
+                "frame": {"duration": 40, "redraw": False},
+                "fromcurrent": True
+            }]
+        }]
+    }]
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+if orbit_reached:
+    st.success("🛰 ORBIT ACHIEVED! Stable orbital velocity reached.")
+else:
+    st.warning("⚠ Orbit not achieved. Try increasing thrust or reducing payload.")
