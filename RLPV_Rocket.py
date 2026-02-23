@@ -214,123 +214,146 @@ m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
 
 import streamlit as st
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
-import time
-import math
 
-st.header("🌍 Earth Orbit Simulation (Rotating Earth)")
+st.set_page_config(layout="wide")
+st.title("🚀 NASA-Style Mission Simulator (Smooth Streamlit Version)")
 
-# ---- Constants ----
-G = 6.67430e-11
-EARTH_MASS = 5.972e24
-EARTH_RADIUS = 6.371e6
+# -------------------------------------------------
+# Load Dataset
+# -------------------------------------------------
+@st.cache_data
+def load_data():
+    df = pd.read_csv("space_missions_dataset.csv")
+    return df
 
-dt = 1
-steps = 9000
-orbit_altitude = 400000  # 400 km
+df = load_data()
 
-r0 = EARTH_RADIUS + orbit_altitude
-x = r0
-y = 0
+mission = st.selectbox("Select Target Mission", df["Mission Name"].unique())
 
-v_orbit = math.sqrt(G * EARTH_MASS / r0)
-vx = 0
-vy = v_orbit
+# -------------------------------------------------
+# Simulation Parameters
+# -------------------------------------------------
+earth_radius = 6371
+orbit_radius = earth_radius + 800
+planet_distance = 20000
+frames = 250
 
-positions_x = []
-positions_y = []
+# -------------------------------------------------
+# Precompute Trajectory
+# -------------------------------------------------
+trajectory_x = []
+trajectory_y = []
 
-placeholder = st.empty()
+for i in range(frames):
+    t = i / frames
 
-revolution_count = 0
-previous_angle = 0
-earth_rotation = 0  # rotation angle
+    if t < 0.3:
+        # Launch (vertical)
+        x = 0
+        y = earth_radius + t * 3000
 
-for i in range(steps):
+    elif t < 0.7:
+        # Orbit (circular)
+        angle = (t - 0.3) * 20
+        x = orbit_radius * np.cos(angle)
+        y = orbit_radius * np.sin(angle)
 
-    r = math.sqrt(x**2 + y**2)
+    else:
+        # Transfer to planet (ellipse)
+        progress = (t - 0.7) / 0.3
+        x = orbit_radius + progress * (planet_distance - orbit_radius)
+        y = orbit_radius * np.sin(progress * np.pi)
 
-    ax = -G * EARTH_MASS * x / r**3
-    ay = -G * EARTH_MASS * y / r**3
+    trajectory_x.append(x)
+    trajectory_y.append(y)
 
-    vx += ax * dt
-    vy += ay * dt
+# -------------------------------------------------
+# Create Animation Frames
+# -------------------------------------------------
+frames_list = []
 
-    x += vx * dt
-    y += vy * dt
-
-    positions_x.append(x)
-    positions_y.append(y)
-
-    # Count revolutions
-    angle = math.atan2(y, x)
-    if previous_angle < 0 and angle >= 0:
-        revolution_count += 1
-    previous_angle = angle
-
-    if revolution_count >= 3:
-        break
-
-    # ---- Earth Rotation ----
-    earth_rotation += 0.01  # controls rotation speed
-
-    theta = np.linspace(0, 2*np.pi, 400)
-    earth_x = EARTH_RADIUS * np.cos(theta + earth_rotation)
-    earth_y = EARTH_RADIUS * np.sin(theta + earth_rotation)
-
-    # Destination Orbit
-    dest_alt = 600000
-    dest_r = EARTH_RADIUS + dest_alt
-    dest_x = dest_r * np.cos(theta)
-    dest_y = dest_r * np.sin(theta)
-
-    fig = go.Figure()
-
-    # Earth (rotating visual)
-    fig.add_trace(go.Scatter(
-        x=earth_x,
-        y=earth_y,
-        mode="lines",
-        fill="toself",
-        name="Earth"
-    ))
-
-    # Destination orbit ring
-    fig.add_trace(go.Scatter(
-        x=dest_x,
-        y=dest_y,
-        mode="lines",
-        line=dict(dash="dash"),
-        name="Destination Orbit"
-    ))
-
-    # Rocket path
-    fig.add_trace(go.Scatter(
-        x=positions_x,
-        y=positions_y,
-        mode="lines",
-        name="Rocket Path"
-    ))
-
-    # Rocket
-    fig.add_trace(go.Scatter(
-        x=[x],
-        y=[y],
-        mode="markers+text",
-        text=["🚀"],
-        textposition="middle center",
-        marker=dict(size=14),
-        name="Rocket"
-    ))
-
-    fig.update_layout(
-        xaxis=dict(scaleanchor="y", scaleratio=1, visible=False),
-        yaxis=dict(visible=False),
-        showlegend=False,
-        height=700
+for i in range(frames):
+    frames_list.append(
+        go.Frame(
+            data=[
+                go.Scatter(
+                    x=[trajectory_x[i]],
+                    y=[trajectory_y[i]],
+                    mode="markers",
+                    marker=dict(size=14, color="white"),
+                )
+            ]
+        )
     )
 
-    placeholder.plotly_chart(fig, use_container_width=True)
-    time.sleep(0.01)
+# -------------------------------------------------
+# Earth Rotation
+# -------------------------------------------------
+theta = np.linspace(0, 2 * np.pi, 200)
+earth_x = earth_radius * np.cos(theta)
+earth_y = earth_radius * np.sin(theta)
 
-st.success(f"🛰 Completed {revolution_count} full orbits successfully!")
+planet_x = planet_distance
+planet_y = 0
+
+# -------------------------------------------------
+# Build Figure
+# -------------------------------------------------
+fig = go.Figure(
+    data=[
+        # Earth
+        go.Scatter(
+            x=earth_x,
+            y=earth_y,
+            fill="toself",
+            fillcolor="blue",
+            line=dict(color="darkblue"),
+            name="Earth",
+        ),
+        # Target Planet
+        go.Scatter(
+            x=[planet_x],
+            y=[planet_y],
+            mode="markers",
+            marker=dict(size=30, color="red"),
+            name="Target Planet",
+        ),
+        # Rocket (initial)
+        go.Scatter(
+            x=[trajectory_x[0]],
+            y=[trajectory_y[0]],
+            mode="markers",
+            marker=dict(size=14, color="white"),
+            name="Rocket",
+        ),
+    ],
+    layout=go.Layout(
+        title="Smooth Orbital Mission Animation",
+        xaxis=dict(range=[-25000, 25000], showgrid=False),
+        yaxis=dict(range=[-25000, 25000], showgrid=False),
+        plot_bgcolor="black",
+        paper_bgcolor="black",
+        font=dict(color="white"),
+        updatemenus=[
+            dict(
+                type="buttons",
+                showactive=False,
+                buttons=[
+                    dict(
+                        label="🚀 Launch Mission",
+                        method="animate",
+                        args=[None, {"frame": {"duration": 40, "redraw": True},
+                                     "fromcurrent": True}],
+                    )
+                ],
+            )
+        ],
+    ),
+    frames=frames_list,
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+st.success(f"🎯 Mission to {mission} simulated successfully.")
