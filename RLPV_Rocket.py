@@ -218,7 +218,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
-st.title("🚀 NASA-Style Mission Simulator (Smooth Streamlit Version)")
+st.title("🚀Mission Simulator ")
 
 # -------------------------------------------------
 # Load Dataset
@@ -357,3 +357,4 @@ fig = go.Figure(
 st.plotly_chart(fig, use_container_width=True)
 
 st.success(f"🎯 Mission to {mission} simulated successfully.")
+
