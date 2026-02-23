@@ -203,3 +203,108 @@ m1, m2, m3 = st.columns(3)
 m1.metric("Final Altitude (m)", f"{sim_df['Altitude (m)'].iloc[-1]:,.2f}")
 m2.metric("Max Velocity (m/s)", f"{sim_df['Velocity (m/s)'].max():,.2f}")
 m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
+
+
+#----------------------------------------------------------
+#additional features
+#----------------------------------------------------------
+# =====================================================
+# 🚀 NASA-Level Animated Rocket Launch
+# =====================================================
+import time
+import base64
+
+st.header("🚀 Live Rocket Launch Simulation")
+
+# Orbit threshold (approx low Earth orbit velocity)
+ORBIT_VELOCITY = 7800  # m/s
+
+# Placeholder containers
+chart_placeholder = st.empty()
+status_placeholder = st.empty()
+
+# Background atmosphere color function
+def atmosphere_color(alt):
+    if alt < 10000:
+        return "#87CEEB"  # light blue
+    elif alt < 50000:
+        return "#4B79A1"  # mid blue
+    elif alt < 100000:
+        return "#1B3C59"  # dark blue
+    else:
+        return "#000000"  # space black
+
+# Play launch sound (base64 small rocket sound)
+rocket_sound = """
+<audio autoplay>
+  <source src="https://www.soundjay.com/mechanical/sounds/rocket-launch-01.mp3" type="audio/mpeg">
+</audio>
+"""
+st.markdown(rocket_sound, unsafe_allow_html=True)
+
+orbit_reached = False
+
+for i in range(len(sim_df)):
+
+    current_alt = sim_df["Altitude (m)"].iloc[i]
+    current_vel = sim_df["Velocity (m/s)"].iloc[i]
+    current_time = sim_df["Time (s)"].iloc[i]
+
+    bg_color = atmosphere_color(current_alt)
+
+    fig_live = go.Figure()
+
+    # Background color change
+    fig_live.update_layout(
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        xaxis=dict(range=[0, sim_df["Time (s)"].max()], visible=False),
+        yaxis=dict(range=[0, sim_df["Altitude (m)"].max()*1.1], visible=False),
+        showlegend=False,
+        height=600
+    )
+
+    # Rocket path
+    fig_live.add_trace(
+        go.Scatter(
+            x=sim_df["Time (s)"][:i+1],
+            y=sim_df["Altitude (m)"][:i+1],
+            mode="lines",
+            line=dict(width=3),
+        )
+    )
+
+    # Rocket body
+    fig_live.add_trace(
+        go.Scatter(
+            x=[current_time],
+            y=[current_alt],
+            mode="text",
+            text=["🚀"],
+            textfont=dict(size=28),
+        )
+    )
+
+    # Exhaust flame effect
+    if sim_df["Mass (kg)"].iloc[i] > rocket_mass + payload:
+        fig_live.add_trace(
+            go.Scatter(
+                x=[current_time],
+                y=[current_alt - sim_df["Altitude (m)"].max()*0.03],
+                mode="text",
+                text=["🔥"],
+                textfont=dict(size=22),
+            )
+        )
+
+    chart_placeholder.plotly_chart(fig_live, use_container_width=True)
+
+    # Orbit detection
+    if current_vel >= ORBIT_VELOCITY and not orbit_reached:
+        status_placeholder.success("🛰 ORBIT ACHIEVED! Stable orbital velocity reached.")
+        orbit_reached = True
+
+    time.sleep(0.03)
+
+if not orbit_reached:
+    status_placeholder.warning("⚠ Orbit not achieved. Increase thrust or reduce payload.")
