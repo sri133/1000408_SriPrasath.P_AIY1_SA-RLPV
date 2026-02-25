@@ -10,11 +10,43 @@ import time
 # -----------------------------------------------------
 st.set_page_config(page_title="Rocket Launch Dashboard", layout="wide")
 
-# Custom CSS for a cleaner "Classic" look
+# Custom CSS for Vibrant, Glowing Metric Cards
 st.markdown("""
     <style>
-    .main { background-color: #f9f9f9; }
-    .stMetric { background-color: #ffffff; border-radius: 10px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    /* Main background */
+    .stApp {
+        background-color: #0E1117;
+    }
+    
+    /* Glowing Metric Cards */
+    [data-testid="stMetric"] {
+        background-color: #161b22;
+        border: 2px solid #00f2ff; /* Neon Cyan Border */
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 0 15px rgba(0, 242, 255, 0.4); /* Outer Glow */
+        transition: transform 0.3s ease;
+    }
+
+    [data-testid="stMetric"]:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 25px rgba(0, 242, 255, 0.6);
+    }
+
+    /* Target the Label (Payload, Fuel, etc.) */
+    [data-testid="stMetricLabel"] {
+        color: #00f2ff !important;
+        font-weight: bold !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Target the Value (The big numbers) */
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        font-family: 'Courier New', Courier, monospace;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -167,7 +199,7 @@ mission_label = st.sidebar.selectbox("Choose Mission Profile", df["Mission Label
 mission_name = mission_label.split(" (")[0]
 mission_row = df[df["Mission Name"] == mission_name].iloc[0]
 
-# Metrics
+# This part of your code remains the same but will now look much different!
 m1, m2, m3 = st.columns(3)
 m1.metric("Payload (kg)", f"{mission_row['Payload Weight (tons)']*1000:,.0f}")
 m2.metric("Fuel (kg)", f"{mission_row['Fuel Consumption (tons)']*1000:,.0f}")
@@ -249,3 +281,4 @@ with col5:
     st.plotly_chart(px.line(sim_df, x="Time", y="Alt", title="Altitude Profile", template="plotly_white"), use_container_width=True)
 with col6:
     st.plotly_chart(px.line(sim_df, x="Time", y="Vel", title="Velocity Profile", template="plotly_white"), use_container_width=True)
+
