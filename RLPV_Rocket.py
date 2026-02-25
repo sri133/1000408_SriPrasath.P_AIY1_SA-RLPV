@@ -205,9 +205,6 @@ m2.metric("Max Velocity (m/s)", f"{sim_df['Velocity (m/s)'].max():,.2f}")
 m3.metric("Final Mass (kg)", f"{sim_df['Mass (kg)'].iloc[-1]:,.2f}")
 
 
-#----------------------------------------------------------
-#additional features
-#----------------------------------------------------------
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -215,77 +212,72 @@ import plotly.graph_objects as go
 import time
 
 # -------------------------------------------------
-# PAGE CONFIG
+# 1. PAGE CONFIG
 # -------------------------------------------------
 st.set_page_config(page_title="Rocket Mission Simulator", layout="wide")
 st.title("🚀 Data-Driven Rocket Mission Simulator")
 
 # -------------------------------------------------
-# LOAD DATA
+# 2. DATA LOADING
 # -------------------------------------------------
 @st.cache_data
 def load_data():
+    # Make sure 'space_missions_dataset.csv' is in your script folder
     df = pd.read_csv("space_missions_dataset.csv")
     df["Launch Date"] = pd.to_datetime(df["Launch Date"], errors="coerce")
 
     numeric_cols = [
-        "Distance from Earth (light-years)",
-        "Mission Duration (years)",
-        "Mission Cost (billion USD)",
-        "Scientific Yield (points)",
-        "Crew Size",
-        "Mission Success (%)",
-        "Fuel Consumption (tons)",
-        "Payload Weight (tons)"
+        "Distance from Earth (light-years)", "Mission Duration (years)",
+        "Mission Cost (billion USD)", "Scientific Yield (points)",
+        "Crew Size", "Mission Success (%)",
+        "Fuel Consumption (tons)", "Payload Weight (tons)"
     ]
 
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
     df = df.dropna()
+    
+    # Create labels for the dropdown
+    df["Mission Label"] = df.apply(
+        lambda row: f"{row['Mission Name']} ({row['Mission Success (%)']}%)",
+        axis=1
+    )
     return df
 
-df = load_data()
+try:
+    df = load_data()
+except Exception as e:
+    st.error(f"Error loading CSV: {e}")
+    st.stop()
 
 # -------------------------------------------------
-# SIDEBAR MISSION SELECTION
+# 3. SIDEBAR & MISSION SELECTION
 # -------------------------------------------------
 st.sidebar.header("🛰 Mission Selection")
-
-# Add mission label with success %
-df["Mission Label"] = df.apply(
-    lambda row: f"{row['Mission Name']} ({row['Mission Success (%)']}%)",
-    axis=1
-)
-
 mission_label = st.sidebar.selectbox("Choose Mission", df["Mission Label"])
 mission_name = mission_label.split(" (")[0]
-
 mission_row = df[df["Mission Name"] == mission_name].iloc[0]
 
-# -------------------------------------------------
-# EXTRACT DATA FROM SELECTED MISSION
-# -------------------------------------------------
+# Extract data
 payload = mission_row["Payload Weight (tons)"] * 1000
 fuel = mission_row["Fuel Consumption (tons)"] * 1000
 success_rate = mission_row["Mission Success (%)"]
 distance = mission_row["Distance from Earth (light-years)"]
 
+# Physics Logic
 base_mass = 400000
 total_mass = base_mass + payload
-
-# Thrust derived from fuel amount
 thrust = fuel * 30
 initial_velocity = thrust / total_mass
-
 orbit_velocity_required = 7800
 planet_distance = 20000 + (distance * 1200)
 
 # -------------------------------------------------
-# DISPLAY MISSION INFO
+# 4. DISPLAY MISSION INFO
 # -------------------------------------------------
 col1, col2, col3 = st.columns(3)
 col1.metric("Payload (kg)", f"{payload:,.0f}")
 col2.metric("Fuel (kg)", f"{fuel:,.0f}")
-col3.metric("Success Rate", f"{success_rate}%")
+col3.metric("Historical Success", f"{success_rate}%")
 
 if success_rate >= 70:
     st.success("🟢 Historically Successful Mission")
@@ -293,36 +285,27 @@ else:
     st.warning("🔴 Low Historical Success Mission")
 
 # -------------------------------------------------
-# SIMULATION LOGIC
+# 5. TRAJECTORY CALCULATIONS
 # -------------------------------------------------
-frames = 200
+frames = 100
 earth_radius = 6371
 orbit_radius = earth_radius + 800
 
-trajectory_x = []
-trajectory_y = []
-
-orbit_achieved = False
+trajectory_x, trajectory_y = [], []
+orbit_achieved = initial_velocity > orbit_velocity_required
 
 for i in range(frames):
     t = i / frames
-
     # Launch Phase
     if t < 0.2:
-        x = 0
-        y = earth_radius + t * initial_velocity * 2
-
+        x, y = 0, earth_radius + t * initial_velocity * 2
     # Orbit Phase
     elif t < 0.5:
-        if initial_velocity > orbit_velocity_required:
-            orbit_achieved = True
+        if orbit_achieved:
             angle = (t - 0.2) * 12
-            x = orbit_radius * np.cos(angle)
-            y = orbit_radius * np.sin(angle)
+            x, y = orbit_radius * np.cos(angle), orbit_radius * np.sin(angle)
         else:
-            x = 0
-            y = earth_radius - (t - 0.2) * 5000
-
+            x, y = 0, earth_radius - (t - 0.2) * 5000
     # Transfer Phase
     else:
         if orbit_achieved:
@@ -330,78 +313,47 @@ for i in range(frames):
             x = orbit_radius + progress * (planet_distance - orbit_radius)
             y = orbit_radius * np.sin(progress * np.pi)
         else:
-            x = 0
-            y = earth_radius - 2000
-
+            x, y = 0, earth_radius - 2000
     trajectory_x.append(x)
     trajectory_y.append(y)
 
 # -------------------------------------------------
-# MISSION SUCCESS LOGIC
-# -------------------------------------------------
-if not orbit_achieved:
-    mission_failed = True
-else:
-    mission_failed = np.random.rand() > (success_rate / 100)
-
-# -------------------------------------------------
-# LAUNCH BUTTON
+# 6. ANIMATION & VISUALIZATION
 # -------------------------------------------------
 st.subheader("🚀 Launch Simulation")
 
 if st.button("Launch Mission"):
-
-    chart = st.empty()
-
-    theta = np.linspace(0, 2*np.pi, 200)
+    chart_placeholder = st.empty()
+    
+    # Pre-calculate Earth circle
+    theta = np.linspace(0, 2*np.pi, 100)
     earth_x = earth_radius * np.cos(theta)
     earth_y = earth_radius * np.sin(theta)
 
     for i in range(len(trajectory_x)):
         fig = go.Figure()
 
-        # Earth
-        fig.add_trace(go.Scatter(
-            x=earth_x,
-            y=earth_y,
-            mode="lines",
-            fill="toself",
-            line=dict(color="blue")
-        ))
-
-        # Target Planet
-        fig.add_trace(go.Scatter(
-            x=[planet_distance],
-            y=[0],
-            mode="markers",
-            marker=dict(size=18, color="orange")
-        ))
-
-        # Rocket
-        fig.add_trace(go.Scatter(
-            x=[trajectory_x[i]],
-            y=[trajectory_y[i]],
-            mode="markers",
-            marker=dict(size=10, color="white")
-        ))
+        # Draw Earth
+        fig.add_trace(go.Scatter(x=earth_x, y=earth_y, mode="lines", fill="toself", line=dict(color="blue")))
+        # Draw Target Planet
+        fig.add_trace(go.Scatter(x=[planet_distance], y=[0], mode="markers", marker=dict(size=18, color="orange")))
+        # Draw Rocket
+        fig.add_trace(go.Scatter(x=[trajectory_x[i]], y=[trajectory_y[i]], mode="markers", marker=dict(size=12, color="red")))
 
         fig.update_layout(
-            xaxis=dict(range=[-planet_distance-5000, planet_distance+5000], visible=False),
-            yaxis=dict(range=[-planet_distance-5000, planet_distance+5000], visible=False),
-            showlegend=False,
-            margin=dict(l=0, r=0, t=0, b=0)
+            xaxis=dict(range=[-planet_distance*1.2, planet_distance*1.2], visible=False),
+            yaxis=dict(range=[-planet_distance*1.2, planet_distance*1.2], visible=False),
+            height=600, showlegend=False, margin=dict(l=0, r=0, t=0, b=0)
         )
 
-        chart.plotly_chart(fig, use_container_width=True)
-        time.sleep(0.02)
-    # -------------------------------------------------
-    # FINAL STATUS
-    # -------------------------------------------------
-    st.subheader("🧠 Mission Outcome")
+        # Use the loop index as a key to prevent DuplicateID error
+        chart_placeholder.plotly_chart(fig, use_container_width=True, key=f"frame_{i}")
+        time.sleep(0.01)
 
+    # Final Outcome Logic
+    mission_failed = (not orbit_achieved) or (np.random.rand() > (success_rate / 100))
+    st.subheader("🧠 Mission Outcome")
     if mission_failed:
-        st.error("💥 Mission Failed")
+        st.error("💥 Mission Failed - Terminal status reached.")
     else:
         st.success("🛰 Mission Successful – Orbit Achieved & Transfer Complete")
-
-
