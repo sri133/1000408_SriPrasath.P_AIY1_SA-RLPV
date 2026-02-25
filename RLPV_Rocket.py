@@ -84,30 +84,50 @@ except Exception as e:
     st.error(f"Error loading CSV: {e}")
     st.stop()
 
-# -----------------------------------------------------
-# SIDEBAR FILTERS
-# -----------------------------------------------------
-st.sidebar.header("🔎 Analytics Filters")
+# -------------------------------------------------
+# 3. SIDEBAR & MISSION CONTROL
+# -------------------------------------------------
+st.sidebar.header("🛰 Mission Selection")
+mission_label = st.sidebar.selectbox("Choose Historical Mission", df["Mission Label"])
+mission_name = mission_label.split(" (")[0]
+mission_row = df[df["Mission Name"] == mission_name].iloc[0]
 
-mission_type = st.sidebar.multiselect(
-    "Mission Type",
-    options=df["Mission Type"].unique(),
-    default=df["Mission Type"].unique()
+st.sidebar.divider()
+st.sidebar.header("⚙ Manual Physics Overrides")
+
+# These sliders now default to the selected mission's data
+# but allow the user to change them manually.
+payload_val = st.sidebar.slider(
+    "Payload Weight (kg)", 
+    5000, 150000, 
+    int(mission_row["Payload Weight (tons)"] * 1000)
 )
 
-vehicle = st.sidebar.multiselect(
-    "Launch Vehicle",
-    options=df["Launch Vehicle"].unique(),
-    default=df["Launch Vehicle"].unique()
+fuel_val = st.sidebar.slider(
+    "Fuel Mass (kg)", 
+    50000, 1000000, 
+    int(mission_row["Fuel Consumption (tons)"] * 1000)
 )
 
-success_filter = st.sidebar.slider("Min Success Rate (%)", 0, 100, 70)
+thrust_val = st.sidebar.slider(
+    "Engine Thrust (kN)", 
+    1000, 50000, 
+    int((mission_row["Fuel Consumption (tons)"] * 30) / 100) # Scaled example logic
+)
 
-filtered_df = df[
-    (df["Mission Type"].isin(mission_type)) &
-    (df["Launch Vehicle"].isin(vehicle)) &
-    (df["Mission Success (%)"] >= success_filter)
-]
+# Use the variables from the sliders for the physics logic
+payload = payload_val
+fuel = fuel_val
+success_rate = mission_row["Mission Success (%)"]
+distance = mission_row["Distance from Earth (light-years)"]
+
+# Physics Logic updated to use slider values
+base_mass = 400000
+total_mass = base_mass + payload
+thrust = thrust_val * 100 # Adjusting scale
+initial_velocity = thrust / total_mass
+orbit_velocity_required = 7800
+planet_distance = 20000 + (distance * 1200)
 
 # -----------------------------------------------------
 # ANALYTICS SECTION
@@ -291,6 +311,7 @@ with col5:
     st.plotly_chart(px.line(sim_df, x="Time", y="Alt", title="Altitude Profile", template="plotly_white"), use_container_width=True)
 with col6:
     st.plotly_chart(px.line(sim_df, x="Time", y="Vel", title="Velocity Profile", template="plotly_white"), use_container_width=True)
+
 
 
 
