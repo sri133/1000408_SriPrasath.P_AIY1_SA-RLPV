@@ -6,41 +6,43 @@ import plotly.graph_objects as go
 import time
 
 # -----------------------------------------------------
-# 1. PAGE CONFIG & CYBER-TECH CSS
+# PAGE CONFIG
 # -----------------------------------------------------
-st.set_page_config(page_title="Rocket Mission Control", layout="wide")
+st.set_page_config(page_title="Rocket Launch Dashboard", layout="wide")
 
+# -----------------------------------------------------
+# CUSTOM DARK UI
+# -----------------------------------------------------
 st.markdown("""
-    <style>
-    /* Main Background */
-    .stApp { background-color: #0E1117; color: #FFFFFF; }
-    
-    /* Glowing Metric Cards */
-    [data-testid="stMetric"] {
-        background-color: #161b22;
-        border: 2px solid #00f2ff;
-        border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
-        transition: transform 0.3s ease;
-    }
-    [data-testid="stMetric"]:hover { transform: scale(1.02); box-shadow: 0 0 25px rgba(0, 242, 255, 0.5); }
-    [data-testid="stMetricLabel"] { color: #00f2ff !important; font-weight: bold; text-transform: uppercase; }
-    [data-testid="stMetricValue"] { color: #ffffff !important; text-shadow: 0 0 5px #00f2ff; font-family: 'Courier New', monospace; }
-    
-    /* Sidebar styling */
-    section[data-testid="stSidebar"] { background-color: #11141a; border-right: 1px solid #30363d; }
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+.stApp { background-color: #0E1117; }
+
+[data-testid="stMetric"] {
+    background-color: #161b22;
+    border: 2px solid #00f2ff;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 0 15px rgba(0, 242, 255, 0.4);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #00f2ff !important;
+    font-weight: bold !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: white !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🚀 Rocket Path Visualization & Mission Analytics")
 
 # -----------------------------------------------------
-# 2. DATA LOADING
+# LOAD DATA
 # -----------------------------------------------------
 @st.cache_data
 def load_data():
-    # Make sure 'space_missions_dataset.csv' is in your script folder
     df = pd.read_csv("space_missions_dataset.csv")
     df["Launch Date"] = pd.to_datetime(df["Launch Date"], errors="coerce")
 
@@ -52,174 +54,220 @@ def load_data():
     ]
 
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
-    df = df.dropna(subset=['Mission Name'])
-    
+    df = df.dropna()
+
     df["Mission Label"] = df.apply(
-        lambda row: f"{row['Mission Name']} ({row['Mission Success (%)']}%)",
+        lambda r: f"{r['Mission Name']} ({r['Mission Success (%)']}%)",
         axis=1
     )
     return df
 
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"Error loading CSV: {e}")
+df = load_data()
+
+# -----------------------------------------------------
+# SIDEBAR FILTERS
+# -----------------------------------------------------
+st.sidebar.header("🔎 Analytics Filters")
+
+mission_type = st.sidebar.multiselect(
+    "Mission Type",
+    df["Mission Type"].unique(),
+    default=df["Mission Type"].unique()
+)
+
+vehicle = st.sidebar.multiselect(
+    "Launch Vehicle",
+    df["Launch Vehicle"].unique(),
+    default=df["Launch Vehicle"].unique()
+)
+
+success_filter = st.sidebar.slider("Min Success Rate (%)", 0, 100, 50)
+
+filtered_df = df[
+    (df["Mission Type"].isin(mission_type)) &
+    (df["Launch Vehicle"].isin(vehicle)) &
+    (df["Mission Success (%)"] >= success_filter)
+]
+
+if filtered_df.empty:
+    st.warning("No missions match filters.")
     st.stop()
 
 # -----------------------------------------------------
-# 3. SIDEBAR: FILTERS & CONTROL MODES
+# ANALYTICS SECTION
 # -----------------------------------------------------
-st.sidebar.header("🔎 Dashboard Filters")
-all_types = df["Mission Type"].unique().tolist()
-all_vehicles = df["Launch Vehicle"].unique().tolist()
+st.header("📊 Mission Visualizations")
 
-selected_types = st.sidebar.multiselect("Mission Type", all_types, default=all_types)
-selected_vehicles = st.sidebar.multiselect("Launch Vehicle", all_vehicles, default=all_vehicles)
-success_filter = st.sidebar.slider("Min Success Rate (%)", 0, 100, 60)
+col1, col2 = st.columns(2)
 
-# Create Filtered DF for Analytics Section
-filtered_df = df[
-    (df["Mission Type"].isin(selected_types)) & 
-    (df["Launch Vehicle"].isin(selected_vehicles)) & 
-    (df["Mission Success (%)"] >= success_filter)
-].copy()
+with col1:
+    fig1 = px.scatter(
+        filtered_df,
+        x="Payload Weight (tons)",
+        y="Fuel Consumption (tons)",
+        color="Mission Type",
+        hover_data=["Mission Name"],
+        template="plotly_dark",
+        title="Payload vs Fuel"
+    )
+    st.plotly_chart(fig1, use_container_width=True)
 
-st.sidebar.divider()
-st.sidebar.header("🕹️ Simulator Control")
-mode = st.sidebar.radio("Input Mode:", ["Historical Mission", "Manual Design"])
+with col2:
+    line_data = filtered_df.copy()
+    line_data["Year"] = line_data["Launch Date"].dt.year
+    line_data = line_data.groupby(["Year", "Mission Type"])["Mission Success (%)"].mean().reset_index()
 
-if mode == "Historical Mission":
-    st.sidebar.subheader("🚀 Mission Selection")
-    mission_label = st.sidebar.selectbox("Choose Mission", df["Mission Label"])
-    mission_name = mission_label.split(" (")[0]
-    m_row = df[df["Mission Name"] == mission_name].iloc[0]
-    
-    # Auto-load mission specs
-    payload_kg = m_row["Payload Weight (tons)"] * 1000
-    fuel_kg = m_row["Fuel Consumption (tons)"] * 1000
-    thrust_n = fuel_kg * 35 # Derived thrust approximation
-    target_name = m_row["Target Name"]
-    distance_ly = m_row["Distance from Earth (light-years)"]
-    hist_success = m_row["Mission Success (%)"]
-else:
-    st.sidebar.subheader("🛠️ Custom Rocket Specs")
-    target_name = st.sidebar.text_input("Target Planet Name", "Proxima b")
-    payload_kg = st.sidebar.slider("Payload (kg)", 1000, 150000, 50000)
-    fuel_kg = st.sidebar.slider("Fuel Mass (kg)", 50000, 1000000, 400000)
-    thrust_n = st.sidebar.slider("Thrust (N)", 1000000, 20000000, 8000000)
-    distance_ly = 1.0 # Default for manual
-    hist_success = 100
-
-# -------------------------------------------------
-# 4. DYNAMIC PHYSICS ENGINE
-# -------------------------------------------------
-def run_simulation(p_load, f_mass, t_force):
-    g, air_density, area, drag_coeff, dt = 9.81, 1.225, 12, 0.45, 1
-    v, alt, f_rem = 0, 0, f_mass
-    sim_data = []
-    
-    for t in range(200):
-        current_thrust = t_force if f_rem > 0 else 0
-        f_rem -= f_mass / 100 if f_rem > 0 else 0 # Fuel depletion
-        
-        m_total = 400000 + f_rem + p_load
-        # Drag reduces as altitude increases
-        drag = 0.5 * air_density * (v**2) * drag_coeff * area if alt < 60000 else 0
-        accel = (current_thrust - (m_total * g) - drag) / m_total
-        
-        v += accel * dt
-        alt += v * dt
-        if alt < 0: alt, v = 0, 0
-        
-        sim_data.append([t, m_total, accel, v, alt])
-    return pd.DataFrame(sim_data, columns=["Time", "Mass", "Acc", "Vel", "Alt"])
-
-# Recalculate simulation instantly based on current Sidebar state
-sim_df = run_simulation(payload_kg, fuel_kg, thrust_n)
+    fig2 = px.line(
+        line_data,
+        x="Year",
+        y="Mission Success (%)",
+        color="Mission Type",
+        markers=True,
+        template="plotly_dark",
+        title="Average Success Over Years"
+    )
+    st.plotly_chart(fig2, use_container_width=True)
 
 # -----------------------------------------------------
-# 5. ANALYTICS SECTION (Vibrant Plotly Charts)
+# SIMULATOR SECTION
 # -----------------------------------------------------
-st.header("📊 Mission Analytics Dashboard")
-if filtered_df.empty:
-    st.warning("No data matches current filters.")
-else:
-    col1, col2 = st.columns(2)
-    with col1:
-        fig1 = px.scatter(filtered_df, x="Payload Weight (tons)", y="Fuel Consumption (tons)", 
-                         color="Mission Type", size="Mission Cost (billion USD)", 
-                         hover_name="Mission Name", title="Payload vs Fuel Efficiency", template="plotly_dark")
-        st.plotly_chart(fig1, use_container_width=True)
-
-    with col2:
-        line_data = filtered_df.copy()
-        line_data['Year'] = line_data['Launch Date'].dt.year
-        success_trend = line_data.groupby(['Year', 'Mission Type'])['Mission Success (%)'].mean().reset_index()
-        fig2 = px.line(success_trend, x="Year", y="Mission Success (%)", color="Mission Type",
-                      title="Success Trends Over Time", template="plotly_dark", markers=True)
-        st.plotly_chart(fig2, use_container_width=True)
-
-# -------------------------------------------------
-# 6. SIMULATOR SECTION
-# -------------------------------------------------
 st.divider()
-st.header(f"🛰️ Rocket Simulator: Destination {target_name}")
+st.header("🛰 Data-Driven Rocket Mission Simulator")
 
-# Metrics with Cyber-Glow styling
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Current Payload", f"{payload_kg:,.0f} kg")
-m2.metric("Total Fuel", f"{fuel_kg:,.0f} kg")
-m3.metric("Peak Velocity", f"{sim_df['Vel'].max():,.1f} m/s")
-m4.metric("Success Record", f"{hist_success}%")
+st.sidebar.markdown("---")
+st.sidebar.header("🚀 Simulator")
 
-col3, col4 = st.columns(2)
-with col3:
-    fig_alt = px.area(sim_results:=sim_df, x="Time", y="Alt", title="Altitude Over Time (m)", 
-                     template="plotly_dark", color_discrete_sequence=['#00f2ff'])
-    st.plotly_chart(fig_alt, use_container_width=True)
+sim_label = st.sidebar.selectbox(
+    "Select Mission",
+    df["Mission Label"],
+    key="sim_select"
+)
 
-with col4:
-    fig_vel = px.line(sim_df, x="Time", y="Vel", title="Velocity Profile (m/s)", 
-                     template="plotly_dark", color_discrete_sequence=['#ff00ff'])
-    st.plotly_chart(fig_vel, use_container_width=True)
+sim_name = sim_label.split(" (")[0]
+sim_row = df[df["Mission Name"] == sim_name].iloc[0]
 
-# -------------------------------------------------
-# 7. ANIMATED LAUNCH TRAJECTORY
-# -------------------------------------------------
-if st.button("🚀 INITIATE LAUNCH SEQUENCE"):
-    ani_placeholder = st.empty()
-    # Dynamic planet distance based on data
-    planet_dist = 30000 + (distance_ly * 5000)
-    theta = np.linspace(0, 2*np.pi, 100)
-    earth_x, earth_y = 6371 * np.cos(theta), 6371 * np.sin(theta)
+payload = sim_row["Payload Weight (tons)"] * 1000
+fuel_mass = sim_row["Fuel Consumption (tons)"] * 1000
+success_rate = sim_row["Mission Success (%)"]
+distance = sim_row["Distance from Earth (light-years)"]
 
-    for i in range(0, len(sim_df), 4):
-        fig_sim = go.Figure()
-        
-        # Earth
-        fig_sim.add_trace(go.Scatter(x=earth_x, y=earth_y, fill="toself", name="Earth", line=dict(color="#1f77b4")))
-        # Target Planet
-        fig_sim.add_trace(go.Scatter(x=[planet_dist], y=[0], mode="markers+text", 
-                                     marker=dict(size=30, color="orange"), text=[target_name], textposition="top center"))
-        # Rocket position
-        prog = i / len(sim_df)
-        rx = prog * planet_dist
-        ry = (sim_df['Alt'].iloc[i] / 10) if prog < 0.2 else (np.sin(prog * np.pi) * 8000)
-        
-        fig_sim.add_trace(go.Scatter(x=[rx], y=[ry], mode="markers+text", 
-                                     marker=dict(size=18, color="#00f2ff", symbol="triangle-up", line=dict(width=2, color="white")),
-                                     text=["🚀"], textposition="top center"))
+base_mass = 400000
+thrust = fuel_mass * 25
 
-        fig_sim.update_layout(
-            template="plotly_dark", height=500, showlegend=False,
-            xaxis=dict(range=[-10000, planet_dist + 15000], showgrid=False, zeroline=False),
-            yaxis=dict(range=[-15000, 25000], showgrid=False, zeroline=False),
-            margin=dict(l=0, r=0, t=30, b=0)
-        )
-        ani_placeholder.plotly_chart(fig_sim, use_container_width=True, key=f"sim_frame_{i}")
-        time.sleep(0.01)
+m1, m2, m3 = st.columns(3)
+m1.metric("Payload (kg)", f"{payload:,.0f}")
+m2.metric("Fuel (kg)", f"{fuel_mass:,.0f}")
+m3.metric("Historical Success", f"{success_rate}%")
 
-    if sim_df['Alt'].iloc[-1] > 10000:
-        st.success(f"STATIONARY ORBIT ACHIEVED: Mission to {target_name} is a Success!")
+# -----------------------------------------------------
+# SIMULATION CALCULATION
+# -----------------------------------------------------
+g = 9.81
+dt = 1
+steps = 160
+
+velocity = 0
+altitude = 0
+fuel = fuel_mass
+
+earth_radius = 6371
+orbit_radius = earth_radius + 1000
+planet_distance = 25000 + (distance * 1500)
+
+trajectory_x = []
+trajectory_y = []
+orbit_achieved = False
+
+for i in range(steps):
+
+    thrust_force = thrust if fuel > 0 else 0
+    fuel -= fuel_mass / 120 if fuel > 0 else 0
+
+    total_mass = base_mass + payload + fuel
+    acceleration = (thrust_force - total_mass * g) / total_mass
+
+    velocity += acceleration * dt
+    altitude += velocity * dt
+
+    if altitude < 0:
+        altitude = 0
+        velocity = 0
+
+    if altitude < orbit_radius:
+        x = 0
+        y = earth_radius + altitude
+
+    elif velocity >= 7800:
+        orbit_achieved = True
+        angle = (i - 40) * 0.08
+        x = orbit_radius * np.cos(angle)
+        y = orbit_radius * np.sin(angle)
+
+    elif orbit_achieved:
+        progress = i / steps
+        x = orbit_radius + progress * (planet_distance - orbit_radius)
+        y = orbit_radius * np.sin(progress * np.pi)
+
     else:
-        st.error("MISSION CRITICAL FAILURE: Rocket failed to reach exit velocity.")
+        x = 0
+        y = earth_radius - 2000
+
+    trajectory_x.append(x)
+    trajectory_y.append(y)
+
+mission_failed = (not orbit_achieved) or (np.random.rand() > success_rate / 100)
+
+# -----------------------------------------------------
+# ANIMATION
+# -----------------------------------------------------
+if st.button("▶ Launch Mission"):
+
+    theta = np.linspace(0, 2*np.pi, 200)
+    earth_x = earth_radius * np.cos(theta)
+    earth_y = earth_radius * np.sin(theta)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=earth_x,
+        y=earth_y,
+        mode="lines",
+        fill="toself"
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[planet_distance],
+        y=[0],
+        mode="markers"
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[trajectory_x[0]],
+        y=[trajectory_y[0]],
+        mode="markers",
+        marker=dict(size=14, symbol="triangle-up")
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=520,
+        showlegend=False,
+        xaxis=dict(range=[-planet_distance, planet_distance+5000], visible=False),
+        yaxis=dict(range=[-planet_distance, planet_distance], visible=False),
+        margin=dict(l=0, r=0, t=0, b=0)
+    )
+
+    placeholder = st.empty()
+
+    for i in range(len(trajectory_x)):
+        fig.data[2].x = [trajectory_x[i]]
+        fig.data[2].y = [trajectory_y[i]]
+        placeholder.plotly_chart(fig, use_container_width=True)
+        time.sleep(0.02)
+
+    st.subheader("Mission Outcome")
+
+    if mission_failed:
+        st.error("💥 Mission Failed")
+    else:
+        st.success("🛰 Mission Successful – Orbit Achieved")
