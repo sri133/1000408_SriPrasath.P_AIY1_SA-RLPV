@@ -83,7 +83,43 @@ try:
 except Exception as e:
     st.error(f"Error loading CSV: {e}")
     st.stop()
+# -----------------------------------------------------
+# SIDEBAR FILTERS (Defined BEFORE they are used)
+# -----------------------------------------------------
+st.sidebar.header("🔎 Analytics Filters")
 
+# Provide safe defaults to prevent empty dataframes
+all_mission_types = df["Mission Type"].unique().tolist()
+all_vehicles = df["Launch Vehicle"].unique().tolist()
+
+mission_type = st.sidebar.multiselect(
+    "Mission Type",
+    options=all_mission_types,
+    default=all_mission_types
+)
+
+vehicle = st.sidebar.multiselect(
+    "Launch Vehicle",
+    options=all_vehicles,
+    default=all_vehicles
+)
+
+success_filter = st.sidebar.slider("Min Success Rate (%)", 0, 100, 70)
+
+# -----------------------------------------------------
+# CREATE FILTERED DATAFRAME
+# -----------------------------------------------------
+# We define filtered_df here so it's available for all charts below
+filtered_df = df[
+    (df["Mission Type"].isin(mission_type)) &
+    (df["Launch Vehicle"].isin(vehicle)) &
+    (df["Mission Success (%)"] >= success_filter)
+].copy()
+
+# Fallback check: if the user filters everything out, show a warning instead of a NameError
+if filtered_df.empty:
+    st.warning("No missions match these filters. Please adjust the sidebar settings.")
+    st.stop()
 # -------------------------------------------------
 # 3. SIDEBAR & MISSION CONTROL
 # -------------------------------------------------
@@ -311,6 +347,7 @@ with col5:
     st.plotly_chart(px.line(sim_df, x="Time", y="Alt", title="Altitude Profile", template="plotly_white"), use_container_width=True)
 with col6:
     st.plotly_chart(px.line(sim_df, x="Time", y="Vel", title="Velocity Profile", template="plotly_white"), use_container_width=True)
+
 
 
 
