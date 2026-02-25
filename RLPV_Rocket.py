@@ -254,8 +254,7 @@ if st.button("▶ Start Mission Simulation"):
         rx = prog * planet_dist
         ry = np.sin(prog * np.pi) * 5000 if prog > 0.1 else sim_df['Alt'].iloc[i]
         
-        # Change this line in your simulation loop:
-fig_sim.add_trace(go.Scatter(
+        fig_sim.add_trace(go.Scatter(
     x=[rx], 
     y=[ry], 
     mode="markers+text", 
@@ -268,6 +267,7 @@ fig_sim.add_trace(go.Scatter(
     text=["🚀"], # We can use the emoji in the text field instead!
     textposition="top center"
 ))
+
         fig_sim.update_layout(
             template="plotly_dark", height=500, showlegend=False,
             xaxis=dict(range=[-8000, planet_dist + 5000], showgrid=False, zeroline=False),
@@ -291,5 +291,6 @@ with col5:
     st.plotly_chart(px.line(sim_df, x="Time", y="Alt", title="Altitude Profile", template="plotly_white"), use_container_width=True)
 with col6:
     st.plotly_chart(px.line(sim_df, x="Time", y="Vel", title="Velocity Profile", template="plotly_white"), use_container_width=True)
+
 
 
