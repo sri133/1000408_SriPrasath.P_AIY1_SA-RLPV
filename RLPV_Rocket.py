@@ -121,49 +121,74 @@ if filtered_df.empty:
     st.warning("No missions match these filters. Please adjust the sidebar settings.")
     st.stop()
 # -------------------------------------------------
-# 3. SIDEBAR & MISSION CONTROL
+# 3. SIDEBAR: MODE SELECTION & CONTROLS
 # -------------------------------------------------
-st.sidebar.header("🛰 Mission Selection")
-mission_label = st.sidebar.selectbox("Choose Historical Mission", df["Mission Label"])
-mission_name = mission_label.split(" (")[0]
-mission_row = df[df["Mission Name"] == mission_name].iloc[0]
+st.sidebar.header("🕹️ Control Mode")
+mode = st.sidebar.radio("Select Input Mode:", ["Historical Mission", "Manual Design"])
 
-st.sidebar.divider()
-st.sidebar.header("⚙ Manual Physics Overrides")
+if mode == "Historical Mission":
+    st.sidebar.subheader("🚀 Mission Selection")
+    mission_label = st.sidebar.selectbox("Choose Mission", df["Mission Label"])
+    mission_name = mission_label.split(" (")[0]
+    m_row = df[df["Mission Name"] == mission_name].iloc[0]
+    
+    # Lock values to mission data
+    payload = m_row["Payload Weight (tons)"] * 1000
+    fuel = m_row["Fuel Consumption (tons)"] * 1000
+    thrust = fuel * 30 
+    target_name = "Target Planet" 
+    distance = m_row["Distance from Earth (light-years)"]
+    success_rate = m_row["Mission Success (%)"]
 
-# These sliders now default to the selected mission's data
-# but allow the user to change them manually.
-payload_val = st.sidebar.slider(
-    "Payload Weight (kg)", 
-    5000, 150000, 
-    int(mission_row["Payload Weight (tons)"] * 1000)
-)
+else:
+    st.sidebar.subheader("🛠️ Custom Rocket Specs")
+    target_name = st.sidebar.text_input("Target Planet Name", "Mars")
+    payload = st.sidebar.slider("Payload (kg)", 1000, 150000, 50000)
+    fuel = st.sidebar.slider("Fuel Mass (kg)", 50000, 1000000, 300000)
+    thrust = st.sidebar.slider("Thrust (N)", 1000000, 20000000, 7000000)
+    # Manual mode distance/success defaults
+    distance = 0.5 
+    success_rate = 100
 
-fuel_val = st.sidebar.slider(
-    "Fuel Mass (kg)", 
-    50000, 1000000, 
-    int(mission_row["Fuel Consumption (tons)"] * 1000)
-)
-
-thrust_val = st.sidebar.slider(
-    "Engine Thrust (kN)", 
-    1000, 50000, 
-    int((mission_row["Fuel Consumption (tons)"] * 30) / 100) # Scaled example logic
-)
-
-# Use the variables from the sliders for the physics logic
-payload = payload_val
-fuel = fuel_val
-success_rate = mission_row["Mission Success (%)"]
-distance = mission_row["Distance from Earth (light-years)"]
-
-# Physics Logic updated to use slider values
+# -------------------------------------------------
+# 4. DYNAMIC PHYSICS CALCULATION
+# -------------------------------------------------
+# This block now runs every time a slider moves
 base_mass = 400000
-total_mass = base_mass + payload
-thrust = thrust_val * 100 # Adjusting scale
-initial_velocity = thrust / total_mass
-orbit_velocity_required = 7800
-planet_distance = 20000 + (distance * 1200)
+g, air_density, area, drag_coeff, dt = 9.81, 1.225, 10, 0.5, 1
+time_steps = 200
+
+def run_simulation(p_load, f_mass, t_force):
+    v, alt, f_rem = 0, 0, f_mass
+    sim_data = []
+    for t in range(time_steps):
+        current_thrust = t_force if f_rem > 0 else 0
+        f_rem -= f_mass / 100 if f_rem > 0 else 0
+        
+        m_total = base_mass + f_rem + p_load
+        drag = 0.5 * air_density * (v**2) * drag_coeff * area
+        accel = (current_thrust - (m_total * g) - drag) / m_total
+        
+        v += accel * dt
+        alt += v * dt
+        if alt < 0: alt, v = 0, 0
+        sim_data.append([t, m_total, accel, v, alt])
+    return pd.DataFrame(sim_data, columns=["Time", "Mass", "Acc", "Vel", "Alt"])
+
+# Generate fresh data based on current UI state
+sim_df = run_simulation(payload, fuel, thrust)
+
+# -------------------------------------------------
+# 5. UPDATED VISUALS
+# -------------------------------------------------
+# Now fig_alt and fig_vel will automatically use the NEW sim_df
+col5, col6 = st.columns(2)
+with col5:
+    st.plotly_chart(px.line(sim_df, x="Time", y="Alt", title=f"Altitude to {target_name}", 
+                            template="plotly_dark", color_discrete_sequence=['#00f2ff']), use_container_width=True)
+with col6:
+    st.plotly_chart(px.line(sim_df, x="Time", y="Vel", title="Velocity Profile", 
+                            template="plotly_dark", color_discrete_sequence=['#ff00ff']), use_container_width=True)
 
 # -----------------------------------------------------
 # ANALYTICS SECTION
@@ -347,6 +372,7 @@ with col5:
     st.plotly_chart(px.line(sim_df, x="Time", y="Alt", title="Altitude Profile", template="plotly_white"), use_container_width=True)
 with col6:
     st.plotly_chart(px.line(sim_df, x="Time", y="Vel", title="Velocity Profile", template="plotly_white"), use_container_width=True)
+
 
 
 
