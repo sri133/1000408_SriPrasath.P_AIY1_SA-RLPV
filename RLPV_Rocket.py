@@ -347,6 +347,8 @@ else:
 # -------------------------------------------------
 # LAUNCH BUTTON
 # -------------------------------------------------
+st.subheader("🚀 Launch Simulation")
+
 if st.button("Launch Mission"):
 
     chart = st.empty()
@@ -356,28 +358,31 @@ if st.button("Launch Mission"):
     earth_y = earth_radius * np.sin(theta)
 
     for i in range(len(trajectory_x)):
-
         fig = go.Figure()
 
+        # Earth
         fig.add_trace(go.Scatter(
             x=earth_x,
             y=earth_y,
             mode="lines",
-            fill="toself"
+            fill="toself",
+            line=dict(color="blue")
         ))
 
+        # Target Planet
         fig.add_trace(go.Scatter(
             x=[planet_distance],
             y=[0],
             mode="markers",
-            marker=dict(size=18)
+            marker=dict(size=18, color="orange")
         ))
 
+        # Rocket
         fig.add_trace(go.Scatter(
             x=[trajectory_x[i]],
             y=[trajectory_y[i]],
             mode="markers",
-            marker=dict(size=10)
+            marker=dict(size=10, color="white")
         ))
 
         fig.update_layout(
@@ -387,10 +392,8 @@ if st.button("Launch Mission"):
             margin=dict(l=0, r=0, t=0, b=0)
         )
 
-        chart.plotly_chart(fig, use_container_width=True, key=f"sim_{i}")
+        chart.plotly_chart(fig, use_container_width=True)
         time.sleep(0.02)
-
-        chart.empty()  # clear previous frame
     # -------------------------------------------------
     # FINAL STATUS
     # -------------------------------------------------
@@ -400,4 +403,5 @@ if st.button("Launch Mission"):
         st.error("💥 Mission Failed")
     else:
         st.success("🛰 Mission Successful – Orbit Achieved & Transfer Complete")
+
 
