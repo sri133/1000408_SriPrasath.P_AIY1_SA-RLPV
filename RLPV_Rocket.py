@@ -165,7 +165,7 @@ if mode == "Historical Mission":
 
     payload = mission["Payload Weight (tons)"] * 1000
     fuel_mass = mission["Fuel Consumption (tons)"] * 1000
-    thrust = fuel_mass * 30
+    thrust = st.sidebar.slider("Thrust (N)", 1_000_000, 30_000_000, 8_000_000)
     mission_success_rate = mission["Mission Success (%)"]
 
 else:
@@ -211,7 +211,22 @@ def simulate(payload, fuel_mass, thrust):
 
     return altitudes, velocities
 
+if "launch" not in st.session_state:
+    st.session_state.launch = False
+
+# -------------------------------------------------
+# LAUNCH CONTROL
+# -------------------------------------------------
+if "launch" not in st.session_state:
+    st.session_state.launch = False
+
 if st.button("🚀 Launch Mission"):
+    st.session_state.launch = True
+
+# -------------------------------------------------
+# RUN SIMULATION (Auto updates with sliders)
+# -------------------------------------------------
+if st.session_state.launch:
 
     altitudes, velocities = simulate(payload, fuel_mass, thrust)
 
@@ -239,7 +254,7 @@ if st.button("🚀 Launch Mission"):
 
     final_altitude = altitudes[-1]
 
-    # Final Mission Success Logic
+    # Dynamic mission success logic
     if mission_success_rate >= 75 and final_altitude > 1000:
         st.success("✅ Mission Successful")
     else:
