@@ -2,14 +2,16 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
-import time
 
-st.set_page_config(page_title="Mission Analytics Dashboard", layout="wide")
+# -----------------------------------------------------
+# PAGE CONFIG
+# -----------------------------------------------------
+st.set_page_config(page_title="Rocket Mission Analytics", layout="wide")
+st.title("🚀 Rocket Mission Analytics & Simulator")
 
-# -------------------------------
+# -----------------------------------------------------
 # LOAD DATA
-# -------------------------------
+# -----------------------------------------------------
 @st.cache_data
 def load_data():
     df = pd.read_csv("space_missions_dataset.csv")
@@ -28,7 +30,6 @@ def load_data():
 
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
     df = df.dropna()
-
     df["Year"] = df["Launch Date"].dt.year
 
     df["Mission Label"] = df.apply(
@@ -40,12 +41,10 @@ def load_data():
 
 df = load_data()
 
-st.title("📊 Mission Analytics Dashboard")
-
-# -------------------------------
+# -----------------------------------------------------
 # SIDEBAR FILTERS
-# -------------------------------
-st.sidebar.header("Filters")
+# -----------------------------------------------------
+st.sidebar.header("🔎 Filters")
 
 mission_type = st.sidebar.multiselect(
     "Mission Type",
@@ -65,20 +64,20 @@ filtered_df = df[
     (df["Mission Type"].isin(mission_type)) &
     (df["Launch Vehicle"].isin(vehicle)) &
     (df["Mission Success (%)"] >= success_filter)
-]
+].copy()
 
 if filtered_df.empty:
-    st.warning("No data available with current filters.")
+    st.warning("No missions match your filters.")
     st.stop()
 
 # =====================================================
-# SECTION 1 – RESOURCE ANALYSIS
+# SECTION 1 — RESOURCE ANALYSIS
 # =====================================================
-st.header("1️⃣ Resource & Cost Analysis")
+st.header("📊 Resource & Cost Analysis")
 
 col1, col2 = st.columns(2)
 
-# Scatter Plot
+# 1️⃣ Scatter Plot
 with col1:
     fig_scatter = px.scatter(
         filtered_df,
@@ -91,7 +90,7 @@ with col1:
     )
     st.plotly_chart(fig_scatter, use_container_width=True)
 
-# Bar Chart (NEW)
+# 2️⃣ Bar Chart
 with col2:
     avg_cost = filtered_df.groupby("Launch Vehicle")["Mission Cost (billion USD)"].mean().reset_index()
 
@@ -104,7 +103,7 @@ with col2:
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
-# Box Plot (NEW)
+# 3️⃣ Box Plot
 fig_box = px.box(
     filtered_df,
     x="Mission Type",
@@ -116,13 +115,13 @@ fig_box = px.box(
 st.plotly_chart(fig_box, use_container_width=True)
 
 # =====================================================
-# SECTION 2 – PERFORMANCE ANALYSIS
+# SECTION 2 — PERFORMANCE ANALYSIS
 # =====================================================
-st.header("2️⃣ Performance & Trends")
+st.header("📈 Performance & Trends")
 
 col3, col4 = st.columns(2)
 
-# Line Plot
+# 4️⃣ Line Plot
 with col3:
     success_trend = filtered_df.groupby(["Year", "Mission Type"])["Mission Success (%)"].mean().reset_index()
 
@@ -137,7 +136,7 @@ with col3:
     )
     st.plotly_chart(fig_line, use_container_width=True)
 
-# Extra Scatter (Rubric-safe)
+# 5️⃣ Extra Scatter
 with col4:
     fig_scatter2 = px.scatter(
         filtered_df,
@@ -150,18 +149,37 @@ with col4:
     st.plotly_chart(fig_scatter2, use_container_width=True)
 
 # =====================================================
-# SECTION 3 – ROCKET SIMULATOR
+# SECTION 3 — CORRELATION BOX ANALYSIS
 # =====================================================
-st.header("3️⃣ Data-Driven Rocket Simulator")
+st.header("📦 Correlation Box Analysis")
 
-sim_label = st.selectbox("Select Mission for Simulation", df["Mission Label"])
+filtered_df["Success Category"] = filtered_df["Mission Success (%)"].apply(
+    lambda x: "High Success (≥75%)" if x >= 75 else "Lower Success (<75%)"
+)
 
-sim_name = sim_label.split(" (")[0]
-sim_row = df[df["Mission Name"] == sim_name].iloc[0]
+fig_corr_box = px.box(
+    filtered_df,
+    x="Success Category",
+    y="Mission Cost (billion USD)",
+    color="Success Category",
+    template="plotly_dark",
+    title="Mission Cost Distribution by Success Category"
+)
 
-payload = sim_row["Payload Weight (tons)"] * 1000
-fuel_mass = sim_row["Fuel Consumption (tons)"] * 1000
-success_rate = sim_row["Mission Success (%)"]
+st.plotly_chart(fig_corr_box, use_container_width=True)
+
+# =====================================================
+# SECTION 4 — ROCKET SIMULATOR
+# =====================================================
+st.header("🛰 Data-Driven Rocket Simulator")
+
+mission_label = st.selectbox("Select Mission for Simulation", df["Mission Label"])
+mission_name = mission_label.split(" (")[0]
+mission_row = df[df["Mission Name"] == mission_name].iloc[0]
+
+payload = mission_row["Payload Weight (tons)"] * 1000
+fuel_mass = mission_row["Fuel Consumption (tons)"] * 1000
+success_rate = mission_row["Mission Success (%)"]
 
 base_mass = 400000
 thrust = fuel_mass * 25
@@ -194,8 +212,6 @@ for i in range(steps):
     altitudes.append(altitude)
     velocities.append(velocity)
 
-mission_failed = np.random.rand() > success_rate / 100
-
 if st.button("🚀 Launch Mission"):
 
     col5, col6 = st.columns(2)
@@ -220,7 +236,7 @@ if st.button("🚀 Launch Mission"):
         )
         st.plotly_chart(fig_vel, use_container_width=True)
 
-    if mission_failed:
-        st.error("💥 Mission Failed")
+    if success_rate >= 75 and altitudes[-1] > 1000:
+        st.success("✅ Mission Successful")
     else:
-        st.success("🛰 Mission Successful")
+        st.error("💥 Mission Failed")
