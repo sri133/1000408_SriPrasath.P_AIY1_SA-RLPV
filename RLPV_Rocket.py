@@ -259,3 +259,113 @@ if st.session_state.launch:
         st.success("✅ Mission Successful")
     else:
         st.error("💥 Mission Failed")
+
+
+# ============================================================
+# 🌌 CINEMATIC SPACE TRAJECTORY ANIMATION
+# ============================================================
+
+st.subheader("🌍 Mission Trajectory Visualization")
+
+# Determine dynamic success value for manual mode
+if mode == "Manual Design":
+    thrust_ratio = thrust / (payload + fuel_mass + 300000)
+    mission_success_rate = min(max(int(thrust_ratio / 0.05), 5), 100)
+
+# Determine how far rocket travels
+if mission_success_rate >= 100:
+    progress_factor = 1.0
+elif mission_success_rate >= 70:
+    progress_factor = 0.85
+elif mission_success_rate >= 30:
+    progress_factor = 0.5
+else:
+    progress_factor = 0.2
+
+# Distance scaling
+planet_distance = 20000
+rocket_max_distance = planet_distance * progress_factor
+
+# Earth
+theta = np.linspace(0, 2*np.pi, 200)
+earth_x = 6000 * np.cos(theta)
+earth_y = 6000 * np.sin(theta)
+
+# Rocket Path
+t_vals = np.linspace(0, progress_factor, 120)
+rocket_x = planet_distance * t_vals
+rocket_y = np.sin(t_vals * np.pi) * 8000
+
+frames = []
+
+for i in range(len(t_vals)):
+    frame = go.Frame(
+        data=[
+            go.Scatter(x=earth_x, y=earth_y, fill="toself",
+                       mode="lines", line=dict(color="#1f77b4"),
+                       name="Earth"),
+
+            go.Scatter(x=[planet_distance], y=[0],
+                       mode="markers",
+                       marker=dict(size=30, color="orange"),
+                       name="Target Planet"),
+
+            go.Scatter(x=[rocket_x[i]], y=[rocket_y[i]],
+                       mode="markers+text",
+                       marker=dict(size=20, color="white"),
+                       text=["🚀"],
+                       textposition="top center",
+                       name="Rocket")
+        ]
+    )
+    frames.append(frame)
+
+fig_anim = go.Figure(
+    data=[
+        go.Scatter(x=earth_x, y=earth_y, fill="toself",
+                   mode="lines", line=dict(color="#1f77b4")),
+        go.Scatter(x=[planet_distance], y=[0],
+                   mode="markers",
+                   marker=dict(size=30, color="orange")),
+        go.Scatter(x=[0], y=[0],
+                   mode="markers+text",
+                   marker=dict(size=20, color="white"),
+                   text=["🚀"],
+                   textposition="top center")
+    ],
+    frames=frames
+)
+
+fig_anim.update_layout(
+    template="plotly_dark",
+    height=600,
+    showlegend=False,
+    xaxis=dict(range=[-8000, planet_distance + 5000],
+               showgrid=False, zeroline=False, visible=False),
+    yaxis=dict(range=[-12000, 12000],
+               showgrid=False, zeroline=False, visible=False),
+    margin=dict(l=0, r=0, t=0, b=0),
+    updatemenus=[
+        dict(type="buttons",
+             showactive=False,
+             buttons=[
+                 dict(label="🚀 Start Mission",
+                      method="animate",
+                      args=[None,
+                            {"frame": {"duration": 40, "redraw": True},
+                             "fromcurrent": True}])
+             ])
+    ]
+)
+
+st.plotly_chart(fig_anim, use_container_width=True)
+
+# Final Message
+if progress_factor == 1.0:
+    st.success("🌟 Target Planet Successfully Reached!")
+elif progress_factor >= 0.7:
+    st.warning("🛰 Mission Nearly Reached Target — Slight Deviation.")
+elif progress_factor >= 0.4:
+    st.warning("⚠ Partial Trajectory — Insufficient Energy.")
+else:
+    st.error("💥 Rocket Failed Early in Mission.")
