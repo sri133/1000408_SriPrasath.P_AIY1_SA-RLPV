@@ -84,6 +84,14 @@ col3.metric("Avg Cost", f"${filtered_df['Mission Cost (billion USD)'].mean():.2f
 col4.metric("Avg Payload", f"{filtered_df['Payload Weight (tons)'].mean():.1f} tons")
 
 # ============================================================
+# RAW DATA VIEW
+# ============================================================
+st.header("📄 Raw Dataset Preview")
+
+if st.checkbox("Show Raw Data Sample"):
+    st.dataframe(filtered_df.head(50), use_container_width=True)
+
+# ============================================================
 # ANALYTICS VISUALS
 # ============================================================
 st.header("📊 Mission Analytics")
@@ -369,3 +377,4 @@ elif progress_factor >= 0.4:
     st.warning("⚠ Partial Trajectory — Insufficient Energy.")
 else:
     st.error("💥 Rocket Failed Early in Mission.")
+
