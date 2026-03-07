@@ -345,9 +345,11 @@ plotly
 matplotlib
 seaborn
 
-🌍 Live Streamlit Web App
+🌍 Live Streamlit Web App and app Story Board with Screenshots.
 
 🔗 Live App Link: https://1000408sriprasathpaiy1sa-rlpv-ansjqlhirp4lee59half7u.streamlit.app/
+
+🔗 Story Borad with Screenshot Link: https://drive.google.com/file/d/1tw6vlX4tUGw-bOeljZjCbEOuKZcADs93/view?usp=sharing
 
 📊 Final Conclusion
 
