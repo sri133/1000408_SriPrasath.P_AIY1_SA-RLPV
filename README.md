@@ -393,6 +393,6 @@ Student Name: Sri Prasath. P
 
 Mentor Name: Syed Ali Beema. S
 
-Course: Mathematics in AI
+Course: Mathematics for AI
 
 School Name: Jain Vidyalaya IB World School
