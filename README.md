@@ -1,5 +1,4 @@
-# 1000408_SriPrasath.P_AIY1_SA-RLPV
-🚀 Rocket Launch Path Visualization 
+# 🚀 Rocket Launch Path Visualization 
 Streamlit Web App for Rocket Mission Analytics & Physics Simulation
 📌 Project Overview
 
@@ -19,8 +18,7 @@ Deploys live on Streamlit Cloud
 
 The system combines mathematical modeling, data analytics, and interactive visualization to help users explore how rocket design parameters influence mission success.
 
-1️⃣ Problem Understanding & Research (10 Marks)
-🔍 Real-World Context
+1️⃣ Problem Understanding & Research 
 
 Rocket launches are governed by fundamental physics principles. A rocket moves upward due to thrust, while gravity pulls it downward. As fuel burns, the rocket becomes lighter, which changes acceleration dynamically over time.
 
@@ -48,7 +46,7 @@ Can simulated physics results align with real historical mission data?
 
 The project integrates mathematical modeling with historical space mission data to answer these questions interactively.
 
-2️⃣ Data Preprocessing & Cleaning (10 Marks)
+2️⃣ Data Preprocessing & Cleaning 
 📂 Dataset Overview
 
 The dataset contains:
@@ -111,7 +109,7 @@ Exploration methods used:
 
 The dataset was fully cleaned before visualization and simulation comparison.
 
-3️⃣ Data Visualization & Analysis (15 Marks)
+3️⃣ Data Visualization & Analysis 
 
 The application includes all required visualization types with interactive controls.
 
@@ -163,7 +161,7 @@ Real-time chart updates
 
 Dark professional dashboard layout
 
-4️⃣ Simulation & Mathematical Modeling (10 Marks)
+4️⃣ Simulation & Mathematical Modeling 
 📐 Mathematical Foundation
 
 The simulation applies Newton’s Second Law:
@@ -329,7 +327,7 @@ Insufficient thrust leads to early mission failure.
 
 Simulation results align with dataset fuel–payload trends.
 
-5️⃣ GitHub Repository & Streamlit Deployment (15 Marks)
+5️⃣ GitHub Repository & Streamlit Deployment 
 📁 Repository Structure
 IDAI104(StudentID)-StudentName/
 │
@@ -388,3 +386,13 @@ Thrust-to-mass ratio significantly impacts launch altitude.
 The final application was deployed successfully on Streamlit Cloud, and the GitHub repository contains organized code, documentation, and deployment details.
 
 This project demonstrates the practical integration of mathematical modeling, statistical reasoning, Python programming, and interactive data visualization in solving real-world aerospace problems.
+
+Credits:
+
+Student Name: Sri Prasath. P
+
+Mentor Name: Syed Ali Beema. S
+
+Course: Mathematics in AI
+
+School Name: Jain Vidyalaya IB World School
